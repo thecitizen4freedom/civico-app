@@ -79,6 +79,42 @@ useEffect(() => {
       const proximoTurno = turno + 1;
 
       if (proximoTurno > 10) {
+        // 🟣 Calcular XP total de la partida para ambos jugadores
+        const xpTotalSnap = await get(ref(db, `emparejamientos/partidas/${partidaId}/xp`));
+        const xpTotal = xpTotalSnap.val() || {};
+
+        const actualizarExperiencia = async (uid, delta) => {
+          if (!uid || uid === "ficticio" || delta === 0) return;
+          const userXPRef = ref(db, `usuarios/${uid}/experiencia`);
+          const userNivelRef = ref(db, `usuarios/${uid}/nivel`);
+          const expActual = (await get(userXPRef)).val() || 0;
+          const nuevaExp = expActual + delta;
+          await set(userXPRef, nuevaExp);
+
+          const escaladoSnap = await get(ref(db, `escalado/niveles`));
+          if (escaladoSnap.exists()) {
+            const escalado = escaladoSnap.val();
+            let nuevoNivel = 1;
+            for (const [nivelStr, rango] of Object.entries(escalado)) {
+              const nivelNum = parseInt(nivelStr);
+              if (nuevaExp >= rango.min && nuevaExp <= rango.max) {
+                nuevoNivel = nivelNum;
+                break;
+              }
+            }
+
+            const nivelActualSnap = await get(userNivelRef);
+            const nivelActual = nivelActualSnap.exists() ? nivelActualSnap.val() : 1;
+            if (nuevoNivel !== nivelActual) {
+              await set(userNivelRef, nuevoNivel);
+            }
+          }
+        };
+
+        for (const [uid, delta] of Object.entries(xpTotal)) {
+          await actualizarExperiencia(uid, delta);
+        }
+
         await set(estadoTurnoRef, "finalizado");
         await limpiarFinalPartida();
         await set(cierreRef, null); // ✅ Fin del cierre
