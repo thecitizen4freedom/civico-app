@@ -40,7 +40,7 @@ useEffect(() => {
       }
     };
 
-    const entregarPuntosYFinalizar = async (turno, xp) => {
+    const entregarPuntosYFinalizar = async (turno, xp, jugador1, jugador2) => {
       await set(cierreRef, true); // 🛑 Cierre iniciado
 
       await new Promise((r) => setTimeout(r, 2000));
@@ -79,6 +79,45 @@ useEffect(() => {
       const proximoTurno = turno + 1;
 
       if (proximoTurno > 10) {
+        // 🟣 Calcular XP total de la partida para ambos jugadores
+        const xpTotalSnap = await get(ref(db, `emparejamientos/partidas/${partidaId}/xp`));
+        const xpTotal = xpTotalSnap.val() || {};
+
+        const xpJugador1 = xpTotal[jugador1] || 0;
+        const xpJugador2 = xpTotal[jugador2] || 0;
+
+        const escaladoSnap = await get(ref(db, `escalado/niveles`));
+        const escalado = escaladoSnap.exists() ? escaladoSnap.val() : null;
+
+        const actualizarExperiencia = async (uid, delta) => {
+          if (!uid || uid === "ficticio") return;
+          const userXPRef = ref(db, `usuarios/${uid}/experiencia`);
+          const userNivelRef = ref(db, `usuarios/${uid}/nivel`);
+          const expActual = (await get(userXPRef)).val() || 0;
+          const nuevaExp = expActual + delta;
+          await set(userXPRef, nuevaExp);
+
+          if (escalado) {
+            let nuevoNivel = 1;
+            for (const [nivelStr, rango] of Object.entries(escalado)) {
+              const nivelNum = parseInt(nivelStr);
+              if (nuevaExp >= rango.min && nuevaExp <= rango.max) {
+                nuevoNivel = nivelNum;
+                break;
+              }
+            }
+
+            const nivelActualSnap = await get(userNivelRef);
+            const nivelActual = nivelActualSnap.exists() ? nivelActualSnap.val() : 1;
+            if (nuevoNivel !== nivelActual) {
+              await set(userNivelRef, nuevoNivel);
+            }
+          }
+        };
+
+        await actualizarExperiencia(jugador1, xpJugador1);
+        await actualizarExperiencia(jugador2, xpJugador2);
+
         await set(estadoTurnoRef, "finalizado");
         await limpiarFinalPartida();
         await set(cierreRef, null); // ✅ Fin del cierre
@@ -203,7 +242,7 @@ useEffect(() => {
       })();
 
       if (estadoTurno.endsWith("-1") && jugadaActual.desafiado === "acierto") {
-        await entregarPuntosYFinalizar(turno, preguntaXP);
+        await entregarPuntosYFinalizar(turno, preguntaXP, jugador1, jugador2);
         return;
       }
 
@@ -218,7 +257,7 @@ useEffect(() => {
       }
 
       if (estadoTurno.endsWith("-2") && jugadaActual.desafiado && jugadaActual.desafiante) {
-        await entregarPuntosYFinalizar(turno, preguntaXP);
+        await entregarPuntosYFinalizar(turno, preguntaXP, jugador1, jugador2);
         return;
       }
 
