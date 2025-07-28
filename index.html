@@ -1,0 +1,25 @@
+
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cívico</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <script>
+  function updateScale() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const scale = Math.min(vw / 1920, vh / 1080);
+    document.documentElement.style.setProperty('--scale', scale);
+  }
+  window.addEventListener('resize', updateScale);
+  updateScale();
+</script>
+
+  </body>
+</html>
